@@ -1,23 +1,74 @@
 import { useState, useCallback } from "react";
-import { Eye, EyeOff, Copy, RefreshCw, Check, Type, Hash, Asterisk, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Copy, RefreshCw, Check, Type, Hash, Asterisk, ArrowRight, Settings2, Zap, KeyRound, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Mascot from "./Mascot";
 import { toast } from "@/hooks/use-toast";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+
+type Preset = "custom" | "pin" | "memorable" | "ultra";
+
+const presets = [
+  { id: "custom" as Preset, name: "Custom", icon: Settings2, description: "Your settings" },
+  { id: "pin" as Preset, name: "PIN", icon: KeyRound, description: "4-8 digits" },
+  { id: "memorable" as Preset, name: "Memorable", icon: MessageSquare, description: "Easy to remember" },
+  { id: "ultra" as Preset, name: "Ultra Secure", icon: Zap, description: "Maximum security" },
+];
 
 const PasswordChecker = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  
+  // Generation options
+  const [length, setLength] = useState(16);
+  const [includeLowercase, setIncludeLowercase] = useState(true);
+  const [includeUppercase, setIncludeUppercase] = useState(true);
+  const [includeNumbers, setIncludeNumbers] = useState(true);
+  const [includeSymbols, setIncludeSymbols] = useState(true);
+  const [activePreset, setActivePreset] = useState<Preset>("custom");
+
+  // Apply preset
+  const applyPreset = (preset: Preset) => {
+    setActivePreset(preset);
+    switch (preset) {
+      case "pin":
+        setLength(6);
+        setIncludeLowercase(false);
+        setIncludeUppercase(false);
+        setIncludeNumbers(true);
+        setIncludeSymbols(false);
+        break;
+      case "memorable":
+        setLength(12);
+        setIncludeLowercase(true);
+        setIncludeUppercase(true);
+        setIncludeNumbers(true);
+        setIncludeSymbols(false);
+        break;
+      case "ultra":
+        setLength(24);
+        setIncludeLowercase(true);
+        setIncludeUppercase(true);
+        setIncludeNumbers(true);
+        setIncludeSymbols(true);
+        break;
+      case "custom":
+      default:
+        break;
+    }
+  };
 
   // Calculate password strength
   const calculateStrength = useCallback((pass: string) => {
     if (!pass) return 0;
 
     let strength = 0;
-    const length = pass.length;
+    const len = pass.length;
 
     // Length contribution (up to 30%)
-    strength += Math.min(length * 3, 30);
+    strength += Math.min(len * 3, 30);
 
     // Character variety (up to 70%)
     if (/[a-z]/.test(pass)) strength += 15;
@@ -58,18 +109,34 @@ const PasswordChecker = () => {
     const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const numbers = "0123456789";
     const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?";
-    const all = lowercase + uppercase + numbers + symbols;
 
+    let charset = "";
     let generated = "";
-    // Ensure at least one of each type
-    generated += lowercase[Math.floor(Math.random() * lowercase.length)];
-    generated += uppercase[Math.floor(Math.random() * uppercase.length)];
-    generated += numbers[Math.floor(Math.random() * numbers.length)];
-    generated += symbols[Math.floor(Math.random() * symbols.length)];
+
+    if (includeLowercase) charset += lowercase;
+    if (includeUppercase) charset += uppercase;
+    if (includeNumbers) charset += numbers;
+    if (includeSymbols) charset += symbols;
+
+    if (!charset) {
+      toast({
+        title: "Oops! 😅",
+        description: "Please enable at least one character type.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Ensure at least one of each selected type
+    if (includeLowercase) generated += lowercase[Math.floor(Math.random() * lowercase.length)];
+    if (includeUppercase) generated += uppercase[Math.floor(Math.random() * uppercase.length)];
+    if (includeNumbers) generated += numbers[Math.floor(Math.random() * numbers.length)];
+    if (includeSymbols) generated += symbols[Math.floor(Math.random() * symbols.length)];
 
     // Fill the rest
-    for (let i = 0; i < 12; i++) {
-      generated += all[Math.floor(Math.random() * all.length)];
+    const remaining = length - generated.length;
+    for (let i = 0; i < remaining; i++) {
+      generated += charset[Math.floor(Math.random() * charset.length)];
     }
 
     // Shuffle
@@ -81,7 +148,7 @@ const PasswordChecker = () => {
     setPassword(generated);
     toast({
       title: "Password Generated! 🎉",
-      description: "A strong password has been created for you.",
+      description: `Created a ${length}-character password for you.`,
     });
   };
 
@@ -194,6 +261,134 @@ const PasswordChecker = () => {
             <span>Special Characters (!@#$%)</span>
           </div>
         </div>
+
+        {/* Options toggle */}
+        <button
+          onClick={() => setShowOptions(!showOptions)}
+          className={cn(
+            "w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed transition-all duration-300",
+            showOptions
+              ? "border-primary bg-primary/5 text-primary"
+              : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          )}
+        >
+          <Settings2 size={18} />
+          <span className="font-medium">{showOptions ? "Hide Options" : "Customize Generator"}</span>
+        </button>
+
+        {/* Generation options */}
+        {showOptions && (
+          <div className="space-y-5 p-5 rounded-2xl bg-muted/50 border border-border fade-in-up">
+            {/* Presets */}
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-foreground">Quick Presets</label>
+              <div className="grid grid-cols-2 gap-2">
+                {presets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => applyPreset(preset.id)}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200",
+                      activePreset === preset.id
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-transparent bg-card hover:bg-card/80 text-foreground"
+                    )}
+                  >
+                    <preset.icon size={18} />
+                    <div className="text-left">
+                      <div className="text-sm font-semibold">{preset.name}</div>
+                      <div className="text-xs text-muted-foreground">{preset.description}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Length slider */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-foreground">Length</label>
+                <span className="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
+                  {length} characters
+                </span>
+              </div>
+              <Slider
+                value={[length]}
+                onValueChange={(value) => {
+                  setLength(value[0]);
+                  setActivePreset("custom");
+                }}
+                min={4}
+                max={32}
+                step={1}
+                className="py-2"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>4</span>
+                <span>32</span>
+              </div>
+            </div>
+
+            {/* Character type toggles */}
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-foreground">Character Types</label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-card">
+                  <div className="flex items-center gap-3">
+                    <Type size={18} className="text-muted-foreground" />
+                    <span className="text-sm font-medium">Lowercase (a-z)</span>
+                  </div>
+                  <Switch
+                    checked={includeLowercase}
+                    onCheckedChange={(checked) => {
+                      setIncludeLowercase(checked);
+                      setActivePreset("custom");
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-card">
+                  <div className="flex items-center gap-3">
+                    <Type size={18} className="text-muted-foreground" />
+                    <span className="text-sm font-medium">Uppercase (A-Z)</span>
+                  </div>
+                  <Switch
+                    checked={includeUppercase}
+                    onCheckedChange={(checked) => {
+                      setIncludeUppercase(checked);
+                      setActivePreset("custom");
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-card">
+                  <div className="flex items-center gap-3">
+                    <Hash size={18} className="text-muted-foreground" />
+                    <span className="text-sm font-medium">Numbers (0-9)</span>
+                  </div>
+                  <Switch
+                    checked={includeNumbers}
+                    onCheckedChange={(checked) => {
+                      setIncludeNumbers(checked);
+                      setActivePreset("custom");
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-card">
+                  <div className="flex items-center gap-3">
+                    <Asterisk size={18} className="text-muted-foreground" />
+                    <span className="text-sm font-medium">Symbols (!@#$%)</span>
+                  </div>
+                  <Switch
+                    checked={includeSymbols}
+                    onCheckedChange={(checked) => {
+                      setIncludeSymbols(checked);
+                      setActivePreset("custom");
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Generate button */}
         <button
